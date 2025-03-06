@@ -2,13 +2,14 @@
     "version": 2,
     "builds": [
         {
-            "src": "api/index.py",
+            "src": "api/*.py",
             "use": "@vercel/python",
             "config": {
                 "runtime": "python3.9",
                 "includeFiles": {
                     "api/**": true
-                }
+                },
+                "maxDuration": 60
             }
         },
         {
@@ -18,6 +19,16 @@
     ],
     "routes": [
         {
+            "src": "/api/preview/(?<folder>[0-9]+)/(?<time>[0-9]+)",
+            "methods": ["GET"],
+            "dest": "api/bot.py"
+        },
+        {
+            "src": "/api/bot",
+            "methods": ["POST"],
+            "dest": "api/bot.py"
+        },
+        {
             "src": "/search",
             "dest": "api/index.py",
             "headers": {
@@ -26,8 +37,8 @@
             }
         },
         {
-            "src": "/(.*)",
+            "src": "/((?!api/).*)",
             "dest": "Web/$1"
         }
     ]
-}
+} 
