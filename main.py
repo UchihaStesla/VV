@@ -1,29 +1,28 @@
 #from FaceRec import FaceRecognizer
 from FaceRec_insightface import FaceRecognizer
-#from CutSubtitle import SubtitleExtractor
 from CutSubtitle_paddleocr import SubtitleExtractor
 import os
 import traceback
 import re
+from params import *
 
-def clean_frames_folder(frames_output):
+def clean_frames_folder():
     """清理帧输出文件夹中的所有文件"""
-    if os.path.exists(frames_output):
-        for file in os.listdir(frames_output):
-            file_path = os.path.join(frames_output, file)
+    if os.path.exists(FRAMES_OUTPUT):
+        for file in os.listdir(FRAMES_OUTPUT):
+            file_path = os.path.join(FRAMES_OUTPUT, file)
             try:
                 if os.path.isfile(file_path):
                     os.unlink(file_path)
             except Exception as e:
                 print(f"Error: {e}")
 
-
-def get_video_progress(video_title, frames_output):
+def get_video_progress(video_title):
     """获取视频处理进度"""
-    if not os.path.exists(frames_output):
+    if not os.path.exists(FRAMES_OUTPUT):
         return None
         
-    frame_files = [f for f in os.listdir(frames_output) 
+    frame_files = [f for f in os.listdir(FRAMES_OUTPUT) 
                    if f.startswith(video_title + "_")]
     if not frame_files:
         return None
@@ -38,16 +37,16 @@ def get_video_progress(video_title, frames_output):
     
     return max(timestamps) if timestamps else None
 
-def process_videos_in_folder(videos_folder, features_file, frames_output, subtitle_output):
+def process_videos_in_folder():
     """处理文件夹中的所有视频"""
     # 确保输出目录存在
-    os.makedirs(frames_output, exist_ok=True)
-    os.makedirs(subtitle_output, exist_ok=True)
+    os.makedirs(FRAMES_OUTPUT, exist_ok=True)
+    os.makedirs(SUBTITLE_OUTPUT, exist_ok=True)
     
     # 获取已经生成字幕的视频
     completed_videos = {
         os.path.splitext(f)[0] 
-        for f in os.listdir(subtitle_output) 
+        for f in os.listdir(SUBTITLE_OUTPUT) 
         if f.endswith('.json')
     }
     
@@ -55,8 +54,8 @@ def process_videos_in_folder(videos_folder, features_file, frames_output, subtit
         # 获取所有视频文件
         video_extensions = ('.mp4', '.avi', '.mkv', '.mov')
         video_files = [
-            f for f in os.listdir(videos_folder)
-            if os.path.isfile(os.path.join(videos_folder, f))
+            f for f in os.listdir(VIDEOS_FOLDER)
+            if os.path.isfile(os.path.join(VIDEOS_FOLDER, f))
             and f.lower().endswith(video_extensions)
             and os.path.splitext(f)[0] not in completed_videos  # 排除已完成字幕的视频
         ]
@@ -70,36 +69,36 @@ def process_videos_in_folder(videos_folder, features_file, frames_output, subtit
         # 处理每个视频
         for i, video_file in enumerate(video_files, 1):
             video_title = os.path.splitext(video_file)[0]
-            video_path = os.path.join(videos_folder, video_file)
+            video_path = os.path.join(VIDEOS_FOLDER, video_file)
             print(f"\nProcessing video {i}/{len(video_files)}: {video_file}")
             
             try:
                 # 检查是否有处理进度
-                progress = get_video_progress(video_title, frames_output)
+                progress = get_video_progress(video_title)
                 if progress is not None:
                     print(f"Resuming from timestamp: {progress//60}m{progress%60}s")
                 
                 # 处理视频
-                face_recognizer = FaceRecognizer(features_file)
+                face_recognizer = FaceRecognizer(FEATURES_FILE)
                 face_recognizer.process_video_with_params(
                     video_path=video_path,
-                    output_folder=frames_output,
+                    output_folder=FRAMES_OUTPUT,
                     fps=1,
-                    start_time=progress  # 添加起始时间参数
+                    start_time=progress
                 )
                 
                 # 处理字幕
                 subtitle_extractor = SubtitleExtractor()
                 subtitle_extractor.process_frames(
-                    input_folder=frames_output,
-                    output_folder=subtitle_output
+                    input_folder=FRAMES_OUTPUT,
+                    output_folder=SUBTITLE_OUTPUT
                 )
                 
                 # 添加到已完成列表
                 completed_videos.add(video_title)
                 
                 # 清理帧文件
-                clean_frames_folder(frames_output)
+                clean_frames_folder()
                 print(f"Cleaned frames for {video_file}")
 
             except Exception:
@@ -107,18 +106,5 @@ def process_videos_in_folder(videos_folder, features_file, frames_output, subtit
                 traceback.print_exc()
                 continue
 
-
 if __name__ == "__main__":
-    # 配置路径
-    videos_folder = "Videos"  # 包含所有视频的文件夹
-    #features_file = "face_features.npz"  # 预计算的特征向量文件
-    features_file = "face_features_insightface.npz"  # 预计算的特征向量文件
-    frames_output = "output_frames"
-    subtitle_output = "subtitle"
-
-    process_videos_in_folder(
-        videos_folder=videos_folder,
-        features_file=features_file,
-        frames_output=frames_output,
-        subtitle_output=subtitle_output
-    )
+    process_videos_in_folder()

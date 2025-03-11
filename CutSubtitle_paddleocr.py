@@ -10,42 +10,38 @@ from collections import defaultdict
 from paddleocr import PaddleOCR
 import traceback
 import logging
+from params import (
+    USE_GPU_OCR, GPU_MEMORY_OCR, 
+    OCR_MODEL_DIR
+)
 
 class SubtitleExtractor:
     def __init__(self):
         logging.disable(logging.WARNING)
-        try:
-            self.ocr = PaddleOCR(
-                use_angle_cls=False,
-                lang="ch",
-                det_model_dir="ch_PP-OCRv4_det_infer",
-                rec_model_dir="ch_PP-OCRv4_rec_infer",
-                cls_model_dir="ch_PP-OCRv4_cls_infer",
-                show_log=False,
-                use_gpu=True,
-                gpu_mem=500,
-                enable_mkldnn=True
-            )
-        except Exception as e:
-            print(f"GPU 初始化失败；回退到 CPU 模式：{str(e)}")
-            self.ocr = PaddleOCR(
-                use_angle_cls=False,
-                lang="ch",
-                det_model_dir="ch_PP-OCRv4_det_infer",
-                rec_model_dir="ch_PP-OCRv4_rec_infer",
-                cls_model_dir="ch_PP-OCRv4_cls_infer",
-                show_log=False,
-                use_gpu=False,
-                enable_mkldnn=True
-            )
+        self.ocr = PaddleOCR(
+            use_angle_cls=False,
+            lang="ch",
+            rec_model_dir=OCR_MODEL_DIR,
+            rec_image_shape=[3, 1200, 90],
+            show_log=False,
+            use_gpu=USE_GPU_OCR,
+            gpu_mem=GPU_MEMORY_OCR if USE_GPU_OCR else None,
+            enable_mkldnn=True,
+            det=False, 
+            cls=False
+        )
         
         self.subtitle_area = (235, 900, 235 + 1200, 900 + 90)
-        
-        # 正则表达式模式
         self.pattern = r'([^_]+)_(\d+m\d+s)_sim_(\d+\.\d+)'
-        
-        # 存储字幕的字典
         self.subtitles_dict = defaultdict(list)
+
+    def clean_text(self, text):
+        """使用正则清理文本末尾的标点符号和多余空格"""
+        if not text:
+            return text
+        # 清理末尾的标点符号和空格
+        # 匹配末尾的：中文标点、英文标点、空格
+        return re.sub(r'[\u3000-\u303F\uFF00-\uFFEF\u2000-\u206F.,!?;:\s]+$', '', text.strip())
 
     def parse_timestamp(self, timestamp):
         """将时间戳 (如 "2m28s") 转换为总秒数"""
@@ -62,30 +58,30 @@ class SubtitleExtractor:
             if img.size != (1920, 1080):
                 raise ValueError("Incorrect image size")
             
+            # 裁剪字幕区域
+            subtitle_img = img.crop(self.subtitle_area)
+            
             # 将PIL Image转换为numpy数组
-            img_array = np.array(img)
+            img_array = np.array(subtitle_img)
             
-            # OCR识别整张图片
-            result = self.ocr.ocr(img_array, cls=True)
+            # 只进行文字识别
+            result = self.ocr.ocr(img_array, det=False, cls=False)
             
-            # 释放 img 和 img_array
+            # 释放内存
             img.close()
-            del img, img_array
+            subtitle_img.close()
+            del img, subtitle_img, img_array
             
-            if result and result[0]:
-                texts = []
-                for line in result[0]:
-                    box = line[0]
-                    box_in_area = all(
-                        self.subtitle_area[0] <= point[0] <= self.subtitle_area[2] and
-                        self.subtitle_area[1] <= point[1] <= self.subtitle_area[3]
-                        for point in box
-                    )
+            if result:
+                text = result[0]
+                if isinstance(text, (list, tuple)):
+                    text = text[0]
+                if isinstance(text, (list, tuple)):
+                    text = text[0]
                     
-                    if box_in_area and line[1][1] > 0.8:
-                        texts.append(line[1][0])
-                
-                return ' '.join(texts).strip()
+                text = str(text).strip()
+                text = self.clean_text(text)
+                return text
             return None
             
         except Exception as e:

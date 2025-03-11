@@ -32,7 +32,7 @@
         
         this.loadPromise = new Promise(async (resolve, reject) => {
             try {
-                const checkResponse = await fetch("./subtitle_db", {
+                const checkResponse = await fetch("https://vvdb.cicada000.work/subtitle_db", {
                     method: "HEAD",
                     referrerPolicy: 'no-referrer',
                     mode: 'cors',
@@ -41,7 +41,7 @@
                 
                 if (!checkResponse.ok) throw new Error(`Database file not found: ${checkResponse.status}`);
                 
-                const response = await fetch("./subtitle_db", {
+                const response = await fetch("https://vvdb.cicada000.work/subtitle_db", {
                     referrerPolicy: 'no-referrer',
                     mode: 'cors',
                     credentials: 'omit'
@@ -215,7 +215,7 @@
         };
     }
 }
-window.dbDebug = { clearCache: async () => { try { await window.subtitleDB.clearCache() } catch (error) { } }, info: () => { window.subtitleDB.printDebugInfo() }, reload: async () => { try { await window.subtitleDB.load() } catch (error) { } }, help: () => { } }; window.subtitleDB = new SubtitleDatabase; fetch("./subtitle_db", { 
+window.dbDebug = { clearCache: async () => { try { await window.subtitleDB.clearCache() } catch (error) { } }, info: () => { window.subtitleDB.printDebugInfo() }, reload: async () => { try { await window.subtitleDB.load() } catch (error) { } }, help: () => { } }; window.subtitleDB = new SubtitleDatabase; fetch("https://vvdb.cicada000.work/subtitle_db", { 
     method: "HEAD",
     referrerPolicy: 'no-referrer',
     mode: 'cors',

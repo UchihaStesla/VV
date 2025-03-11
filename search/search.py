@@ -10,7 +10,11 @@ from rich.console import Console
 from rich.prompt import Prompt, FloatPrompt, IntPrompt
 from rich.panel import Panel
 from rich.table import Table
-from rich import print
+
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from params import USE_GPU_SEARCH, SEARCH_BATCH_SIZE
+from mapping import get_video_url  # 在文件开头添加导入
 
 # 配置日志和控制台
 logging.getLogger('sentence_transformers').setLevel(logging.WARNING)
@@ -27,7 +31,8 @@ class SubtitleEntry:
 class SubtitleSearch:
     def __init__(self, subtitle_folder, model_name='BAAI/bge-large-zh-v1.5'):
         self.subtitle_folder = subtitle_folder
-        self.model = SentenceTransformer(model_name)
+        self.use_gpu = USE_GPU_SEARCH
+        self.model = SentenceTransformer(model_name, device='cuda' if self.use_gpu else 'cpu')
         self.entries = []
         self.min_image_similarity = 0.6
         self.search_k = 5
@@ -56,10 +61,14 @@ class SubtitleSearch:
         self.sentence_embeddings = self.model.encode(
             texts,
             show_progress_bar=True,
-            batch_size=1
+            batch_size=SEARCH_BATCH_SIZE
         )
         dimension = self.sentence_embeddings.shape[1]
-        self.index = faiss.IndexFlatL2(dimension)
+        if USE_GPU_SEARCH:
+            res = faiss.StandardGpuResources()
+            self.index = faiss.GpuIndexFlatL2(res, dimension)
+        else:
+            self.index = faiss.IndexFlatL2(dimension)
         self.index.add(self.sentence_embeddings)
 
     def save_index(self, index_dir):
@@ -69,8 +78,12 @@ class SubtitleSearch:
         embeddings_path = os.path.join(index_dir, 'embeddings.npy')
         entries_path = os.path.join(index_dir, 'entries.json')
         
-        # 保存FAISS索引
-        faiss.write_index(self.index, index_path)
+        # 如果是GPU索引，需要先转换为CPU索引再保存
+        if USE_GPU_SEARCH:
+            cpu_index = faiss.index_gpu_to_cpu(self.index)
+            faiss.write_index(cpu_index, index_path)
+        else:
+            faiss.write_index(self.index, index_path)
         
         # 保存嵌入向量
         np.save(embeddings_path, self.sentence_embeddings)
@@ -94,9 +107,16 @@ class SubtitleSearch:
         embeddings_path = os.path.join(index_dir, 'embeddings.npy')
         entries_path = os.path.join(index_dir, 'entries.json')
         
-        # 加载FAISS索引
-        self.index = faiss.read_index(index_path)
+        # 先加载为CPU索引
+        cpu_index = faiss.read_index(index_path)
         
+        # 如果启用了GPU，将索引转换为GPU版本
+        if USE_GPU_SEARCH:
+            res = faiss.StandardGpuResources()
+            self.index = faiss.index_cpu_to_gpu(res, 0, cpu_index)
+        else:
+            self.index = cpu_index
+            
         # 加载嵌入向量
         self.sentence_embeddings = np.load(embeddings_path)
         
@@ -111,10 +131,9 @@ class SubtitleSearch:
     def search(self, query, k=None):
         if k is None:
             k = self.search_k
-            
         
         search_k = min(k * 30, len(self.entries))
-        query_embedding = self.model.encode([query])
+        query_embedding = self.model.encode([query], batch_size=SEARCH_BATCH_SIZE)  # 使用配置的批处理大小
         distances, indices = self.index.search(query_embedding, search_k)
         
 
@@ -278,15 +297,21 @@ if __name__ == "__main__":
                 table.add_column("文本相似度", justify="right", width=10)
                 table.add_column("图像相似度", justify="right", width=10)
                 table.add_column("内容")
+                table.add_column("打开", justify="center", width=8)
                 
                 for idx, result in enumerate(results, 1):
+                    # 获取视频URL
+                    video_url = get_video_url(result["filename"], result["timestamp"])
+                    url_text = "[link]打开[/]" if video_url else "-"
+                    
                     table.add_row(
                         f"[cyan]{idx}[/]",
                         result["filename"],
                         result["timestamp"],
                         f"{result['text_similarity']:.3f}",
                         f"{result['image_similarity']:.3f}",
-                        result["text"]
+                        result["text"],
+                        url_text if not video_url else f"[link={video_url}]打开[/]"
                     )
                 console.print(table)
         except Exception as e:

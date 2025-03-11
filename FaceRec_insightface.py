@@ -6,6 +6,7 @@ from typing import Optional, List
 from insightface.app import FaceAnalysis
 from numpy.typing import NDArray
 from PIL import Image
+from params import USE_GPU_FACE
 
 
 def cosine_similarity(A: NDArray, B: NDArray) -> NDArray:
@@ -30,16 +31,20 @@ def cosine_similarity(A: NDArray, B: NDArray) -> NDArray:
 
 class FaceRecognizer:
     def __init__(self, features_file: str) -> None:
+        providers = ['CPUExecutionProvider']
+        if USE_GPU_FACE:
+            providers.insert(0, 'CUDAExecutionProvider')
+            
         self.app = FaceAnalysis(
             name='buffalo_l',
-            providers=['CUDAExecutionProvider', 'CPUExecutionProvider'] 
+            providers=providers
         )
         self.app.prepare(ctx_id=0, det_size=(640, 640))
     
         self.stored_features = np.load(features_file)
         self.known_face_encodings = self.stored_features['encodings']
         
-        if self._cuda_available():
+        if USE_GPU_FACE:
             import torch
             self.known_face_encodings = torch.tensor(
                 self.known_face_encodings, 
@@ -49,12 +54,6 @@ class FaceRecognizer:
         else:
             self.use_cuda = False
 
-    def _cuda_available(self) -> bool:
-        try:
-            import torch
-            return torch.cuda.is_available()
-        except ImportError:
-            return False
 
     def load_features(self, features_file: str) -> None:
         try:
@@ -102,10 +101,6 @@ class FaceRecognizer:
                 np.vstack(face_encodings)
             )
             return float(np.max(similarities))
-
-    def recognize_face(self, frame: NDArray, threshold: float = 0.6) -> bool:
-        similarity = self.get_face_similarity(frame)
-        return bool(similarity is not None and similarity > threshold)
 
     def process_video(self, video_path: str, fps: int = 1, save_frames_folder: str = "output_frames", start_time: Optional[int] = None) -> None:
         if not os.path.exists(video_path):

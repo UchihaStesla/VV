@@ -16,6 +16,7 @@ def search():
         query = request.args.get('query', '')
         min_ratio = request.args.get('min_ratio', '50')
         min_similarity = request.args.get('min_similarity', '0.5')
+        max_results = request.args.get('max_results', '50')
 
         # 添加参数验证
         if not query:
@@ -38,6 +39,7 @@ def search():
         query_string = f"query={query}"
         query_string += f"&min_ratio={min_ratio}"
         query_string += f"&min_similarity={min_similarity}"
+        query_string += f"&max_results={max_results}"
 
         def generate():
             try:

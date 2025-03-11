@@ -5,12 +5,13 @@ from tqdm import tqdm
 from insightface.app import FaceAnalysis
 from PIL import Image
 import traceback
+from params import FACE_IMAGES_FOLDER, FEATURES_FILE, USE_GPU_FACE
 
 class FeatureGenerator:
     def __init__(self):
         # 加载insightface模型，指定具体模型
         self.model = FaceAnalysis(name='buffalo_l')
-        self.model.prepare(ctx_id=0, det_size=(640, 640), det_thresh=0.5)
+        self.model.prepare(ctx_id=0 if USE_GPU_FACE else -1, det_size=(640, 640), det_thresh=0.5)
 
     def extract_face_encoding(self, image):
         # 图像预处理
@@ -32,18 +33,18 @@ class FeatureGenerator:
             
         return faces[0].embedding
 
-    def generate_features(self, images_folder, output_file):
+    def generate_features(self):
         face_encodings = []
         
         # 获取所有图片文件
-        image_files = [f for f in os.listdir(images_folder) 
+        image_files = [f for f in os.listdir(FACE_IMAGES_FOLDER) 
                       if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
         
         print(f"Processing {len(image_files)} images...")
         
         # 使用tqdm显示进度条
         for image_file in tqdm(image_files):
-            image_path = os.path.join(images_folder, image_file)
+            image_path = os.path.join(FACE_IMAGES_FOLDER, image_file)
             try:
                 # 使用PIL读取图片
                 pil_img = Image.open(image_path)
@@ -63,10 +64,10 @@ class FeatureGenerator:
         try:
             # 保存特征向量
             if face_encodings:
-                np.savez(output_file,
+                np.savez(FEATURES_FILE,
                         encodings=np.array(face_encodings))
                 print(f"\nSuccessfully generated features for {len(face_encodings)} images")
-                print(f"Features saved to {output_file}")
+                print(f"Features saved to {FEATURES_FILE}")
             else:
                 print("No valid faces found in the images")
         except Exception as e:
@@ -75,7 +76,4 @@ class FeatureGenerator:
 
 if __name__ == "__main__":
     generator = FeatureGenerator()
-    # 设置图片文件夹和输出文件路径
-    images_folder = "target"  # 替换为你的图片文件夹路径
-    output_file = "face_features_insightface.npz"
-    generator.generate_features(images_folder, output_file)
+    generator.generate_features()
