@@ -5,6 +5,9 @@
 > [!CAUTION]
 > 本项目仅供娱乐，请合理使用。
 
+> [!CAUTION]
+> 本项目最近为流量高峰期，各个网址（如调用API）可能有变动，请仔细阅读README。
+
 ## 致谢
 
 &emsp;&emsp;感谢[wen999di](https://github.com/wen999di)及其提交的[PR](https://github.com/Cicada000/VV/issues?q=is%3Apr+author%3Awen999di)，大幅提高了人脸检测准确率和字幕识别准确率。感谢[undef-i](https://github.com/undef-i)及其提交的[PR](https://github.com/Cicada000/VV/issues?q=is%3Apr+author%3Aundef-i)，大幅提高了字幕检索速度，并且添加了GPU支持，大幅减少了新版本的人脸识别和字幕识别所需的时间。
@@ -77,7 +80,7 @@
 &emsp;&emsp;API具体请求示例如下：
 
 ```
-https://vv.cicada000.work/search?query=测试&min_ratio=50&min_similarity=0.5&max_results=10
+https://vvapi.cicada000.work/search?query=测试&min_ratio=50&min_similarity=0.5&max_results=10
 ```
 
 参数解释：
