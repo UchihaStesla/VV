@@ -8,9 +8,7 @@ FACE_IMAGES_FOLDER = "target"  # VV人脸图片文件夹
 # GPU配置
 USE_GPU_FACE = False  # 是否在人脸识别中使用GPU
 USE_GPU_OCR = False   # 是否在OCR中使用GPU
-USE_GPU_SEARCH = False  # 是否在句意搜索中使用GPU
 GPU_MEMORY_OCR = 500  # OCR的GPU内存限制(MB)
-SEARCH_BATCH_SIZE = 32  # 批处理大小
 
 # OCR模型配置
 OCR_MODEL_DIR = "ch_PP-OCRv4_rec_infer"  # OCR模型目录
