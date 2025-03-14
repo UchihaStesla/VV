@@ -66,6 +66,8 @@
 
 `Web`：文件夹，网页前端代码。
 
+`search`: 文件夹，句意搜索
+
 ### 运行本项目的说明
 
 > [!TIP]
@@ -92,6 +94,12 @@ https://vvapi.cicada000.work/search?query=测试&min_ratio=50&min_similarity=0.5
 `min_similarity`：最小的人脸识别匹配度，一般认为0.5以上为VV。
 
 `max_results`：返回的结果最多的个数，如果不添加默认返回全部匹配的结果。
+
+## 句意搜索使用说明
+<center><img src="search.GIF" style="max-height:3000px"></center>
+
+运行`search/search.py`
+可从[Releases](https://github.com/wen999di/VV/releases/download/index/index.zip)下载构建完成的向量索引数据库，解压到search文件夹下
 
 ## To-Do List
 
