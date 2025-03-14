@@ -61,6 +61,7 @@ body {
     font-size: 3rem;
     font-weight: 800;
     letter-spacing: 0.05em;
+    padding-bottom: 0.136em;
     background: linear-gradient(to right, var(--accent), var(--gray-600));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -69,6 +70,8 @@ body {
 .logo-image {
     height: 48px;
     width: auto;
+    vertical-align: baseline;
+    top: calc(48px-.729em) / 2;
 }
 
 .main-content {
