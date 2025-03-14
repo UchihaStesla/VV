@@ -308,8 +308,12 @@ input:focus {
 }
 
 .site-footer {
-    text-align: center;
-    padding: 2rem 0;
+    position: fixed;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 1rem;
+    z-index: 1000;
+    text-align: right;
 }
 
 .github-link {
@@ -320,6 +324,15 @@ input:focus {
 
 .github-link:hover {
     opacity: 1;
+}
+
+.back-to-top{
+    position: fixed;
+    bottom: 0.5rem;
+    right: 0.5rem;
+    padding: 1rem;
+    z-index: 1000;
+    text-align: right;
 }
 
 @media (max-width: 640px) {
