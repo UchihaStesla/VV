@@ -575,6 +575,12 @@ class SearchController {
         try {
           if (line.trim()) {
             const item = JSON.parse(line);
+            
+            // 检查文件名是否以.json结尾，如果不是则添加
+            if (item.filename && !item.filename.endsWith('.json')) {
+              item.filename = item.filename + '.json';
+            }
+            
             results.push(item);
           }
         } catch (e) {}
