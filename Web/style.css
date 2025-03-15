@@ -314,6 +314,8 @@ input:focus {
     padding: 1rem;
     z-index: 1000;
     text-align: right;
+    backdrop-filter: blur(20px);
+    -webkit-mask: radial-gradient(closest-side circle, #000 40%, transparent 100%);
 }
 
 .github-link {
@@ -333,6 +335,8 @@ input:focus {
     padding: 1rem;
     z-index: 1000;
     text-align: right;
+    backdrop-filter: blur(20px);
+    -webkit-mask: radial-gradient(closest-side circle, #000 40%, transparent 100%);
 }
 
 @media (max-width: 640px) {
