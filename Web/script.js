@@ -707,3 +707,19 @@ function handleCardClick(result) {
         }
     }
 }
+// backToTop
+var button = document.getElementById('backToTop');
+button.style.display = 'none';
+window.addEventListener('scroll', function() {
+    if (window.pageYOffset > 200) {
+        button.style.display = 'block';
+    } else {
+        button.style.display = 'none';
+    }
+});
+button.addEventListener('click', function() {
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+});
