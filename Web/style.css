@@ -61,6 +61,7 @@ body {
     font-size: 3rem;
     font-weight: 800;
     letter-spacing: 0.05em;
+    padding-bottom: 0.136em;
     background: linear-gradient(to right, var(--accent), var(--gray-600));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -69,6 +70,8 @@ body {
 .logo-image {
     height: 48px;
     width: auto;
+    vertical-align: baseline;
+    top: calc(48px-.729em) / 2;
 }
 
 .main-content {
@@ -308,8 +311,14 @@ input:focus {
 }
 
 .site-footer {
-    text-align: center;
-    padding: 2rem 0;
+    position: fixed;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 1rem;
+    z-index: 1000;
+    text-align: right;
+    backdrop-filter: blur(20px);
+    -webkit-mask: radial-gradient(closest-side circle, #000 40%, transparent 100%);
 }
 
 .github-link {
@@ -320,6 +329,17 @@ input:focus {
 
 .github-link:hover {
     opacity: 1;
+}
+
+.back-to-top{
+    position: fixed;
+    bottom: 0.5rem;
+    right: 0.5rem;
+    padding: 1rem;
+    z-index: 1000;
+    text-align: right;
+    backdrop-filter: blur(20px);
+    -webkit-mask: radial-gradient(closest-side circle, #000 40%, transparent 100%);
 }
 
 @media (max-width: 640px) {

@@ -11,10 +11,11 @@ from rich.prompt import Prompt, FloatPrompt, IntPrompt
 from rich.panel import Panel
 from rich.table import Table
 
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from params import USE_GPU_SEARCH, SEARCH_BATCH_SIZE
-from mapping import get_video_url  # 在文件开头添加导入
+from mapping import get_video_url
+
+# 配置参数
+USE_GPU_SEARCH = False  # 是否在SentenceTransformer中使用GPU
+SEARCH_BATCH_SIZE = 256  # 索引构建时的批处理大小
 
 # 配置日志和控制台
 logging.getLogger('sentence_transformers').setLevel(logging.WARNING)
@@ -27,6 +28,7 @@ class SubtitleEntry:
     timestamp: str
     filename: str
     image_similarity: float = 0.0  # 添加图像相似度字段
+    id: int = None
 
 class SubtitleSearch:
     def __init__(self, subtitle_folder, model_name='BAAI/bge-large-zh-v1.5'):
@@ -37,9 +39,8 @@ class SubtitleSearch:
         self.min_image_similarity = 0.6
         self.search_k = 5
         self.index = None
-        self.sentence_embeddings = None
-        self.min_text_similarity = 0.5  # 添加文本相似度阈值
-        
+        self.min_text_similarity = 0.5
+    
     def load_subtitles(self):
         json_files = [f for f in os.listdir(self.subtitle_folder) if f.endswith('.json')]
         for filename in tqdm(json_files, desc="加载字幕文件"):
@@ -56,45 +57,54 @@ class SubtitleSearch:
                             image_similarity=entry.get('similarity', 0.0)  # 读取图像相似度
                         ))
 
+    def load_subtitle_file(self, filename):
+        """加载单个字幕文件"""
+        filepath = os.path.join(self.subtitle_folder, filename)
+        entries = []
+        with open(filepath, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+            video_name = filename[:-5]  # 去除.json后缀
+            for entry in data:
+                entries.append(SubtitleEntry(
+                    text=entry['text'],
+                    timestamp=entry['timestamp'],
+                    filename=video_name,
+                    image_similarity=entry.get('similarity', 0.0)
+                ))
+        return entries
+
     def create_index(self):
         texts = [entry.text for entry in self.entries]
-        self.sentence_embeddings = self.model.encode(
+        embeddings = self.model.encode(
             texts,
             show_progress_bar=True,
             batch_size=SEARCH_BATCH_SIZE
         )
-        dimension = self.sentence_embeddings.shape[1]
-        if USE_GPU_SEARCH:
-            res = faiss.StandardGpuResources()
-            self.index = faiss.GpuIndexFlatL2(res, dimension)
-        else:
-            self.index = faiss.IndexFlatL2(dimension)
-        self.index.add(self.sentence_embeddings)
+        dimension = embeddings.shape[1]
+        base_index = faiss.IndexFlatL2(dimension)
+        idmap = faiss.IndexIDMap(base_index)
+        # 为每个条目分配 id（使用 顺序编号 ）
+        for i, entry in enumerate(self.entries):
+            entry.id = int(i)
+        id_array = np.arange(len(self.entries), dtype=np.int64)
+        idmap.add_with_ids(embeddings, id_array)
+        self.index = idmap
 
     def save_index(self, index_dir):
-        """保存索引和嵌入向量到文件"""
+        """保存索引和条目数据到文件"""
         os.makedirs(index_dir, exist_ok=True)
         index_path = os.path.join(index_dir, 'faiss.index')
-        embeddings_path = os.path.join(index_dir, 'embeddings.npy')
         entries_path = os.path.join(index_dir, 'entries.json')
         
-        # 如果是GPU索引，需要先转换为CPU索引再保存
-        if USE_GPU_SEARCH:
-            cpu_index = faiss.index_gpu_to_cpu(self.index)
-            faiss.write_index(cpu_index, index_path)
-        else:
-            faiss.write_index(self.index, index_path)
+        faiss.write_index(self.index, index_path)
         
-        # 保存嵌入向量
-        np.save(embeddings_path, self.sentence_embeddings)
-        
-        # 保存entries数据
         entries_data = [
             {
                 'text': e.text,
                 'timestamp': e.timestamp,
                 'filename': e.filename,
-                'image_similarity': e.image_similarity
+                'image_similarity': e.image_similarity,
+                'id': e.id
             }
             for e in self.entries
         ]
@@ -102,23 +112,11 @@ class SubtitleSearch:
             json.dump(entries_data, f, ensure_ascii=False, indent=2)
 
     def load_index(self, index_dir):
-        """从文件加载索引和嵌入向量"""
+        """从文件加载索引和条目数据"""
         index_path = os.path.join(index_dir, 'faiss.index')
-        embeddings_path = os.path.join(index_dir, 'embeddings.npy')
         entries_path = os.path.join(index_dir, 'entries.json')
         
-        # 先加载为CPU索引
-        cpu_index = faiss.read_index(index_path)
-        
-        # 如果启用了GPU，将索引转换为GPU版本
-        if USE_GPU_SEARCH:
-            res = faiss.StandardGpuResources()
-            self.index = faiss.index_cpu_to_gpu(res, 0, cpu_index)
-        else:
-            self.index = cpu_index
-            
-        # 加载嵌入向量
-        self.sentence_embeddings = np.load(embeddings_path)
+        self.index = faiss.read_index(index_path)
         
         # 加载entries数据
         with open(entries_path, 'r', encoding='utf-8') as f:
@@ -128,12 +126,144 @@ class SubtitleSearch:
                 for entry in entries_data
             ]
 
+    def update_index(self):
+        # 读取所有当前文件的条目
+        current_entries = {}
+        for filename in tqdm(os.listdir(self.subtitle_folder), desc="扫描字幕文件"):
+            if filename.endswith('.json'):
+                video_name = filename[:-5]  # 去掉.json后缀
+                with open(os.path.join(self.subtitle_folder, filename), 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    for entry in data:
+                        key = (video_name, entry['timestamp'])
+                        current_entries[key] = entry['text']
+        # 构建原有条目映射（仅包含 id 不为空的）
+        existing_map = { (entry.filename, entry.timestamp): entry for entry in self.entries if entry.id is not None }
+        
+        new_entries = []
+        changed_entries = []          # 记录文本改变的条目（需要更新向量）
+        incremental_entries = []      # 记录全新的条目（需要添加向量）
+        
+        for key, text in current_entries.items():
+            if key in existing_map:
+                exist = existing_map[key]
+                if exist.text != text:
+                    # 文本改变，保留原有 id
+                    new_entry = SubtitleEntry(
+                        text=text,
+                        timestamp=key[1],
+                        filename=key[0],
+                        image_similarity=0.0,
+                        id=exist.id
+                    )
+                    new_entries.append(new_entry)
+                    changed_entries.append(new_entry)
+                else:
+                    new_entries.append(exist)
+            else:
+                # 全新条目
+                new_ent = SubtitleEntry(
+                    text=text,
+                    timestamp=key[1],
+                    filename=key[0],
+                    image_similarity=0.0
+                )
+                new_entries.append(new_ent)
+                incremental_entries.append(new_ent)
+        
+        # 对全新条目分配新的 id
+        existing_ids = [entry.id for entry in self.entries if entry.id is not None]
+        max_id = max(existing_ids) if existing_ids else -1
+        for entry in incremental_entries:
+            max_id += 1
+            entry.id = max_id
+        
+        # 针对文本变化的条目，逐条更新：
+        if changed_entries:
+            for entry in tqdm(changed_entries, desc="更新已变更条目"):
+                # 删除旧向量
+                self.index.remove_ids(np.array([entry.id], dtype=np.int64))
+                # 计算更新后的向量并添加
+                embedding = self.model.encode([entry.text])
+                self.index.add_with_ids(embedding, np.array([entry.id], dtype=np.int64))
+        
+        # 对全新条目批量添加向量
+        if incremental_entries:
+            new_texts = [ent.text for ent in incremental_entries]
+            console.print("[cyan]正在处理新增条目...[/]")
+            new_embeddings = self.model.encode(
+                new_texts,
+                batch_size=SEARCH_BATCH_SIZE,
+                show_progress_bar=True
+            )
+            new_ids = np.array([ent.id for ent in incremental_entries], dtype=np.int64)
+            self.index.add_with_ids(new_embeddings, new_ids)
+        
+        # 计算删除的条目数
+        deleted_count = len(existing_map) - len([e for e in new_entries if e.id in [ex.id for ex in existing_map.values()]])
+        
+        self.entries = new_entries
+        
+        return {
+            'old_count': len(existing_map),
+            'new_count': len(self.entries),
+            'diff': len(self.entries) - len(existing_map),
+            'new_entries': len(incremental_entries),
+            'deleted': deleted_count
+        }
+
+    def check_index_integrity(self):
+        """检查索引完整性并修复"""
+        # 获取entries中的所有ID
+        entry_ids = set(entry.id for entry in self.entries if entry.id is not None)
+        
+        # 获取FAISS索引中的所有ID
+        all_ids = np.arange(self.index.ntotal).astype('int64')
+        _, faiss_ids = self.index.search(np.zeros((1, self.index.d), dtype='float32'), self.index.ntotal)
+        faiss_ids = set(faiss_ids[0])
+        
+        # 比较差异
+        missing_in_faiss = entry_ids - faiss_ids
+        extra_in_faiss = faiss_ids - entry_ids
+        
+        if not missing_in_faiss and not extra_in_faiss:
+            return {
+                'status': 'ok',
+                'message': '索引完整性检查通过',
+                'fixed': False
+            }
+        
+        # 修复索引
+        # 1. 删除FAISS中多余的ID
+        if extra_in_faiss:
+            self.index.remove_ids(np.array(list(extra_in_faiss), dtype=np.int64))
+        
+        # 2. 为缺失的条目重新添加向量
+        if missing_in_faiss:
+            missing_entries = [entry for entry in self.entries if entry.id in missing_in_faiss]
+            texts = [entry.text for entry in missing_entries]
+            embeddings = self.model.encode(
+                texts,
+                batch_size=SEARCH_BATCH_SIZE,
+                show_progress_bar=True
+            )
+            missing_ids = np.array([entry.id for entry in missing_entries], dtype=np.int64)
+            self.index.add_with_ids(embeddings, missing_ids)
+        
+        return {
+            'status': 'fixed',
+            'message': f'索引已修复 (删除: {len(extra_in_faiss)}, 补充: {len(missing_in_faiss)})',
+            'fixed': True,
+            'removed': len(extra_in_faiss),
+            'added': len(missing_in_faiss)
+        }
+
     def search(self, query, k=None):
         if k is None:
             k = self.search_k
         
         search_k = min(k * 30, len(self.entries))
-        query_embedding = self.model.encode([query], batch_size=SEARCH_BATCH_SIZE)  # 使用配置的批处理大小
+        query_embedding = self.model.encode([query])
         distances, indices = self.index.search(query_embedding, search_k)
         
 
@@ -178,10 +308,10 @@ if __name__ == "__main__":
         # 检查索引文件是否存在
         if os.path.exists(index_dir):
             console.print("\n[cyan]发现已存在的索引文件[/]")
-            console.print("\n1. 使用已有索引\n2. 重新构建索引")
+            console.print("\n1. 使用已有索引\n2. 更新索引\n3. 重新构建索引")
             choice = Prompt.ask(
                 "请选择",
-                choices=["1", "2"],
+                choices=["1", "2", "3"],
                 default="1"
             )
             
@@ -189,6 +319,22 @@ if __name__ == "__main__":
                 console.print("[cyan]正在加载索引...[/]")
                 searcher.load_index(index_dir)
                 console.print("[green]索引加载完成![/]")
+                input("\n按Enter继续...")
+            elif choice == "2":
+                console.print("[cyan]正在加载索引...[/]")
+                searcher.load_index(index_dir)
+                console.print("[cyan]正在更新索引...[/]")
+                stats = searcher.update_index()
+                console.print("[cyan]正在保存索引...[/]")
+                searcher.save_index(index_dir)
+                console.print(
+                    f"[green]索引更新完成![/]\n"
+                    f"原有条目: {stats['old_count']}\n"
+                    f"现有条目: {stats['new_count']}\n" 
+                    f"新增条目: {stats['new_entries']}\n"
+                    f"删除条目: {stats['deleted']}\n"
+                    f"净变化: {stats['diff']:+d}"
+                )
                 input("\n按Enter继续...")
             else:
                 console.print("[cyan]准备构建新索引...[/]")
@@ -241,11 +387,12 @@ if __name__ == "__main__":
                 console.print(Panel(
                     f"1. 图像相似度阈值 ({searcher.min_image_similarity:.2f})\n"
                     f"2. 每页结果数量 ({searcher.search_k})\n"
+                    "3. 检查索引完整性\n"
                     "0. 返回搜索",
                     title="设置菜单"
                 ))
                 
-                choice = Prompt.ask("选择要修改的设置", choices=["0", "1", "2"])
+                choice = Prompt.ask("选择要修改的设置", choices=["0", "1", "2", "3"])
                 if choice == "1":
                     try:
                         new_sim = FloatPrompt.ask(
@@ -274,6 +421,22 @@ if __name__ == "__main__":
                             raise ValueError("数值必须在1到50之间")
                     except ValueError as e:
                         console.print(f"\n[red]✗ 输入无效: {str(e)}[/]")
+                    finally:
+                        input('\n按Enter继续...')
+                elif choice == "3":
+                    console.print("\n[cyan]正在检查索引完整性...[/]")
+                    try:
+                        result = searcher.check_index_integrity()
+                        if result['status'] == 'ok':
+                            console.print(f"\n[green]✓ {result['message']}[/]")
+                        else:
+                            console.print(f"\n[yellow]! {result['message']}[/]")
+                            if result['fixed']:
+                                console.print("[cyan]正在保存修复后的索引...[/]")
+                                searcher.save_index(index_dir)
+                                console.print("[green]✓ 索引已更新[/]")
+                    except Exception as e:
+                        console.print(f"\n[red]✗ 检查失败: {str(e)}[/]")
                     finally:
                         input('\n按Enter继续...')
                 elif choice == "0":

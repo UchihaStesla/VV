@@ -114,12 +114,6 @@ class SubtitleExtractor:
 
             print(f"识别到文本: {text}")
             
-            # 检查重复
-            subtitles = self.subtitles_dict[video_title]
-            if subtitles and subtitles[-1]["text"] == text:
-                continue
-            
-            # 添加字幕
             self.subtitles_dict[video_title].append({
                 "timestamp": timestamp,
                 "similarity": float(similarity),
@@ -129,11 +123,32 @@ class SubtitleExtractor:
         # 保存字幕文件
         for video_title, subtitles in self.subtitles_dict.items():
             sorted_subtitles = sorted(subtitles, key=lambda x: self.parse_timestamp(x["timestamp"]))
+            deduped = []
+            group = []
+            for entry in sorted_subtitles:
+                if not group:
+                    group.append(entry)
+                else:
+                    prev_time = self.parse_timestamp(group[-1]["timestamp"])
+                    curr_time = self.parse_timestamp(entry["timestamp"])
+                    if entry["text"] == group[0]["text"] and curr_time - prev_time == 1:
+                        group.append(entry)
+                    else:
+                        if len(group) > 1:
+                            deduped.append(max(group, key=lambda x: x["similarity"]))
+                        else:
+                            deduped.extend(group)
+                        group = [entry]
+            if group:
+                if len(group) > 1:
+                    deduped.append(max(group, key=lambda x: x["similarity"]))
+                else:
+                    deduped.extend(group)
+
             output_json = os.path.join(output_folder, f"{video_title}.json")
-            
             try:
                 with open(output_json, 'w', encoding='utf-8') as f:
-                    json.dump(sorted_subtitles, f, ensure_ascii=False, indent=4)
+                    json.dump(deduped, f, ensure_ascii=False, indent=4)
                 print(f"成功保存 {video_title} 的字幕")
             except Exception as e:
                 print(f"保存文件时出错: {str(e)}")
