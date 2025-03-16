@@ -576,7 +576,6 @@ class SearchController {
           if (line.trim()) {
             const item = JSON.parse(line);
             
-            // 检查文件名是否以.json结尾，如果不是则添加
             if (item.filename && !item.filename.endsWith('.json')) {
               item.filename = item.filename + '.json';
             }
@@ -631,6 +630,7 @@ async function handleSearch(event) {
     document.getElementById("errorDisplay").style.display = "block";
     completeLoadingBar();
   } finally {
+    enableKeywordTags();
     searchForm.classList.remove("searching");
   }
 }
@@ -761,12 +761,44 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 function displayResults(data, append = false) {
   const resultsDiv = document.getElementById("results");
+  const keywordsContainer = document.getElementById("keywordsContainer");
 
   document.getElementById("errorDisplay").style.display = "none";
 
   if (!append) {
     resultsDiv.innerHTML = "";
     AppState.displayedCount = 0;
+    keywordsContainer.innerHTML = "";
+    keywordsContainer.classList.remove("show");
+  }
+
+  if (!append && data.data.length > 0 && data.data[0].type === "keywords") {
+    const keywords = data.data[0].keywords;
+    if (keywords && keywords.length > 0) {
+      keywordsContainer.innerHTML = `
+        <div class="keywords-tags">
+          ${keywords.map(keyword => `<span class="keyword-tag">${keyword}</span>`).join("")}
+        </div>
+      `;
+      keywordsContainer.classList.add("show");
+      
+      keywordsContainer.querySelectorAll('.keyword-tag').forEach(tag => {
+        tag.addEventListener('click', () => {
+          if (AppState.isSearching) return;
+          
+          const keyword = tag.textContent;
+          document.getElementById('query').value = keyword;
+          
+          keywordsContainer.querySelectorAll('.keyword-tag').forEach(t => {
+            t.classList.add('disabled');
+          });
+          
+          document.getElementById('searchForm').dispatchEvent(new Event('submit'));
+        });
+      });
+    }
+    
+    data.data = data.data.slice(1);
   }
 
   if (data.data && data.data.length === 1 && data.data[0].count === 0) {
@@ -1086,4 +1118,10 @@ function handleCardClick(result) {
         break;
       }
   }
+}
+function enableKeywordTags() {
+  const keywordsContainer = document.getElementById("keywordsContainer");
+  keywordsContainer.querySelectorAll('.keyword-tag').forEach(tag => {
+    tag.classList.remove('disabled');
+  });
 }
