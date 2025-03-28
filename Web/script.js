@@ -1013,7 +1013,48 @@ async function loadPreviewImage(card, result) {
             URL.revokeObjectURL(url);
           }, "image/png");
         });
-
+        
+        // 添加复制按钮
+        const copyButton = document.createElement("button");
+        copyButton.className = "copy-button";
+        copyButton.title = "复制图片";
+        copyButton.innerHTML = `<img src="copy.svg" alt="复制" class="copy-icon">`;
+        
+        copyButton.addEventListener("click", (e) => {
+          e.stopPropagation();
+          displayCanvas.toBlob(async (blob) => {
+            if (!blob) {
+              console.error("Failed to create image blob");
+              return;
+            }
+            try {
+              // 尝试使用Clipboard API复制图片
+              await navigator.clipboard.write([
+                new ClipboardItem({
+                  [blob.type]: blob
+                })
+              ]);
+              
+              // 显示成功提示
+              const toast = document.createElement("div");
+              toast.className = "copy-toast";
+              toast.textContent = "已复制到剪贴板";
+              document.body.appendChild(toast);
+              
+              // 2秒后移除提示
+              setTimeout(() => {
+                toast.classList.add("fade-out");
+                setTimeout(() => toast.remove(), 300);
+              }, 2000);
+              
+            } catch (err) {
+              console.error("复制失败:", err);
+              alert("复制失败，请使用更新的浏览器或手动保存图片");
+            }
+          }, "image/png");
+        });
+        
+        imgContainer.appendChild(copyButton);
         imgContainer.appendChild(displayCanvas);
         setTimeout(() => {
           displayCanvas.classList.add("loaded");
