@@ -1,0 +1,10 @@
+name = "subtitle-search"
+main = "src/worker.ts"
+compatibility_date = "2025-03-23"
+
+[ai]
+binding = "AI"
+
+[[vectorize]]
+binding = "SUBTITLE_INDEX"
+index_name = "vv-search"

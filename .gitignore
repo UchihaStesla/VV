@@ -171,4 +171,5 @@ output_frames/
 shibing624_chinese-text-correction-1.5b/
 dlib_module/
 ch_PP-OCRv4_rec_infer/
-search/index/
+search/local/index/
+node_modules/
