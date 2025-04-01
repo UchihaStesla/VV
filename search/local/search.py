@@ -81,7 +81,9 @@ class SubtitleSearch:
             batch_size=SEARCH_BATCH_SIZE
         )
         dimension = embeddings.shape[1]
-        base_index = faiss.IndexFlatL2(dimension)
+        # 规范化向量以使用内积计算余弦相似度
+        faiss.normalize_L2(embeddings)
+        base_index = faiss.IndexFlatIP(dimension)  # 使用内积代替L2距离
         idmap = faiss.IndexIDMap(base_index)
         # 为每个条目分配 id（使用 顺序编号 ）
         for i, entry in enumerate(self.entries):
@@ -185,6 +187,7 @@ class SubtitleSearch:
                 self.index.remove_ids(np.array([entry.id], dtype=np.int64))
                 # 计算更新后的向量并添加
                 embedding = self.model.encode([entry.text])
+                faiss.normalize_L2(embedding)
                 self.index.add_with_ids(embedding, np.array([entry.id], dtype=np.int64))
         
         # 对全新条目批量添加向量
@@ -196,6 +199,7 @@ class SubtitleSearch:
                 batch_size=SEARCH_BATCH_SIZE,
                 show_progress_bar=True
             )
+            faiss.normalize_L2(new_embeddings)
             new_ids = np.array([ent.id for ent in incremental_entries], dtype=np.int64)
             self.index.add_with_ids(new_embeddings, new_ids)
         
@@ -247,6 +251,7 @@ class SubtitleSearch:
                 batch_size=SEARCH_BATCH_SIZE,
                 show_progress_bar=True
             )
+            faiss.normalize_L2(embeddings)
             missing_ids = np.array([entry.id for entry in missing_entries], dtype=np.int64)
             self.index.add_with_ids(embeddings, missing_ids)
         
@@ -264,10 +269,9 @@ class SubtitleSearch:
         
         search_k = min(k * 30, len(self.entries))
         query_embedding = self.model.encode([query])
-        distances, indices = self.index.search(query_embedding, search_k)
-        
-
-        similarities = 1 / (1 + distances[0])
+        # 规范化查询向量
+        faiss.normalize_L2(query_embedding)
+        similarities, indices = self.index.search(query_embedding, search_k)
         
         results = []
         for i in range(search_k):
@@ -275,11 +279,10 @@ class SubtitleSearch:
                 break
             entry = self.entries[indices[0][i]]
             
-            # 严格执行图像相似度阈值过滤
             if entry.image_similarity < self.min_image_similarity:
                 continue
                 
-            text_sim = float(similarities[i])
+            text_sim = float(similarities[0][i])  # 直接使用内积结果作为相似度
             img_sim = entry.image_similarity
             
             results.append({
