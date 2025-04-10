@@ -173,3 +173,4 @@ dlib_module/
 ch_PP-OCRv4_rec_infer/
 search/local/index/
 node_modules/
+entries.json

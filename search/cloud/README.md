@@ -80,10 +80,10 @@ GET /?query={搜索文本}[&min_similarity={最小相似度}][&max_results={最�
 | CLOUDFLARE_ACCOUNT_ID | Cloudflare账户ID | xxx |
 
 > **API切换说明**：
-> 1. 如使用硅基流动的`BAAI/bge-large-zh-v1.5`模型：
+> 1. 如使用硅基流动的`BAAI/bge-m3`模型：
 >    - 配置SF_API_KEY环境变量（默认）
 >    - 在[index-data.ts](./tools/index-data.ts#L18)中修改`USE_SF_API`变量为true
-> 2. 否则使用Cloudflare Worker AI的`@cf/baai/bge-large-en-v1.5`模型
+> 2. 否则使用Cloudflare Worker AI的`@cf/baai/bge-m3`模型
 
 ### 1. 创建索引
 ```bash

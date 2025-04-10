@@ -15,7 +15,7 @@ const CONFIG = {
     CF_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
     CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN,
     SF_API_KEY: process.env.SF_API_KEY,
-    USE_SF_API: true,
+    USE_SF_API: false,
     
     // 并发和批处理配置
     MAX_CONCURRENT: 16,         // embedding最大并发请求数
@@ -313,7 +313,7 @@ async function generateEmbeddings(texts: string[]) {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        model: 'BAAI/bge-large-zh-v1.5',
+                        model: 'BAAI/bge-m3',
                         input: batchTexts,
                         encoding_format: 'float'
                     })
@@ -337,7 +337,7 @@ async function generateEmbeddings(texts: string[]) {
     } else {
         const processBatch = async (batchTexts: string[]): Promise<number[][]> => {
             const response = await callCloudflareAPI<EmbeddingResponse>(
-                `/accounts/${CONFIG.CF_ACCOUNT_ID}/ai/run/@cf/baai/bge-large-en-v1.5`,
+                `/accounts/${CONFIG.CF_ACCOUNT_ID}/ai/run/@cf/baai/bge-m3`,
                 'POST',
                 { text: batchTexts }
             );

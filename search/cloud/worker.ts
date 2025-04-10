@@ -95,7 +95,7 @@ async function handleSearch(
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'BAAI/bge-large-zh-v1.5',
+                model: 'BAAI/bge-m3',
                 input: [query],
                 encoding_format: 'float'
             })
@@ -111,7 +111,7 @@ async function handleSearch(
     } else {
         // 使用 Cloudflare AI API
         debugLogs.push("Using Cloudflare AI API for embeddings");
-        embeddingResult = await env.AI.run('@cf/baai/bge-large-en-v1.5', {
+        embeddingResult = await env.AI.run('@cf/baai/bge-m3', {
             text: [query]
         });
     }
@@ -163,7 +163,8 @@ export default {
                 headers: {
                     'Access-Control-Allow-Origin': '*',
                     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type'
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                    'Content-Type': 'application/json; charset=utf-8'
                 }
             });
         }
@@ -193,7 +194,7 @@ export default {
                     {
                         status: 400,
                         headers: {
-                            'Content-Type': 'application/json',
+                            'Content-Type': 'application/json; charset=utf-8',
                             'Access-Control-Allow-Origin': '*'
                         }
                     }
@@ -209,7 +210,7 @@ export default {
                     {
                         status: 400,
                         headers: {
-                            'Content-Type': 'application/json',
+                            'Content-Type': 'application/json; charset=utf-8',
                             'Access-Control-Allow-Origin': '*'
                         }
                     }
@@ -231,7 +232,7 @@ export default {
                 JSON.stringify(responseBody),
                 {
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json; charset=utf-8',
                         'Access-Control-Allow-Origin': '*'
                     }
                 }
@@ -254,7 +255,7 @@ export default {
                     {
                         status: searchError.code === 40006 ? 400 : 500,
                         headers: {
-                            'Content-Type': 'application/json',
+                            'Content-Type': 'application/json; charset=utf-8',
                             'Access-Control-Allow-Origin': '*'
                         }
                     }
@@ -265,7 +266,7 @@ export default {
                     {
                         status: 500,
                         headers: {
-                            'Content-Type': 'application/json',
+                            'Content-Type': 'application/json; charset=utf-8',
                             'Access-Control-Allow-Origin': '*'
                         }
                     }

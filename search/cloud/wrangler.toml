@@ -1,5 +1,5 @@
 name = "subtitle-search"
-main = "src/worker.ts"
+main = "worker.ts"
 compatibility_date = "2025-03-23"
 
 [ai]
