@@ -31,7 +31,7 @@ class SubtitleEntry:
     id: int = None
 
 class SubtitleSearch:
-    def __init__(self, subtitle_folder, model_name='BAAI/bge-large-zh-v1.5'):
+    def __init__(self, subtitle_folder, model_name='BAAI/bge-m3'):
         self.subtitle_folder = subtitle_folder
         self.use_gpu = USE_GPU_SEARCH
         self.model = SentenceTransformer(model_name, device='cuda' if self.use_gpu else 'cpu')
