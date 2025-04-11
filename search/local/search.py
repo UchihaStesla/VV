@@ -302,7 +302,7 @@ class SubtitleSearch:
 
 if __name__ == "__main__":
     console = Console()
-    subtitle_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'subtitle')
+    subtitle_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'subtitle')
     index_dir = os.path.join(os.path.dirname(__file__), 'index')
     
     try:
