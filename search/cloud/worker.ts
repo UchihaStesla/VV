@@ -1,5 +1,6 @@
 // 调试模式配置
-const ALLOW_DEBUG = false; // 控制是否允许调试模式
+const ALLOW_DEBUG = false; // 开启调试模式方便排查问题
+const EXTERNAL_API_URL = 'https://vvapi.cicada000.work/search'; // 外部 API 地址
 
 // AI 服务相关类型定义
 interface SFEmbeddingResponse {
@@ -56,11 +57,11 @@ interface Env {
 }
 
 interface SearchResult {
-    text: string;
-    timestamp: string;
     filename: string;
-    text_similarity: number;
-    image_similarity: number;
+    timestamp: string;
+    match_ratio: number;
+    text: string;
+    similarity: number;
 }
 
 // 自定义错误类型
@@ -142,17 +143,77 @@ async function handleSearch(
             text: v.metadata.text,
             timestamp: v.metadata.timestamp,
             filename: v.metadata.filename,
-            text_similarity: v.score,
-            image_similarity: v.metadata.image_similarity
+            match_ratio: v.score,
+            similarity: v.metadata.image_similarity
         }))
-        .filter(v => v.text_similarity >= minSimilarity)
-        .sort((a, b) => b.text_similarity - a.text_similarity)
+        .filter(v => v.match_ratio >= minSimilarity)
+        .sort((a, b) => b.match_ratio - a.match_ratio)
         .slice(0, maxResults)
         .map(v => ({
             ...v,
-            text_similarity: Math.round(v.text_similarity * 1000) / 1000,
-            image_similarity: Math.round(v.image_similarity * 1000) / 1000
+            match_ratio: Math.round(v.match_ratio * 1000) / 1000,
+            similarity: Math.round(v.similarity * 1000) / 1000
         }));
+}
+
+// 转发请求到外部 API
+async function forwardToExternalAPI(
+    url: URL, 
+    request: Request, 
+    debugLogs: string[]
+): Promise<Response> {
+    // 构建外部 API URL
+    const externalUrl = new URL(EXTERNAL_API_URL);
+    
+    // 复制所有查询参数，但移除 rag 参数
+    url.searchParams.forEach((value, key) => {
+        if (key !== 'rag') {
+            externalUrl.searchParams.append(key, value);
+        }
+    });
+    
+    debugLogs.push(`Forwarding request to: ${externalUrl.toString()}`);
+    
+    // 创建新的请求，保留原始请求的方法和头信息
+    const forwardRequest = new Request(externalUrl.toString(), {
+        method: request.method,
+        headers: request.headers,
+    });
+    
+    debugLogs.push(`Forward request created with URL: ${forwardRequest.url}`);
+    
+    // 发送请求并返回结果
+    const response = await fetch(forwardRequest);
+    
+    debugLogs.push(`Received response from external API with status: ${response.status}`);
+    
+    // 如果内容是文本，获取并记录它
+    try {
+        const clonedResponse = response.clone();
+        const responseText = await clonedResponse.text();
+        debugLogs.push(`Response body (first 200 chars): ${responseText.substring(0, 200)}`);
+        
+        // 构建新的响应，保留原始响应的状态和内容
+        return new Response(responseText, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: {
+                'Content-Type': response.headers.get('Content-Type') || 'application/json; charset=utf-8',
+                'Access-Control-Allow-Origin': '*'
+            }
+        });
+    } catch (error) {
+        debugLogs.push(`Error reading response: ${error}`);
+        // 构建新的响应，保留原始响应的状态和内容
+        return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: {
+                'Content-Type': response.headers.get('Content-Type') || 'application/json; charset=utf-8',
+                'Access-Control-Allow-Origin': '*'
+            }
+        });
+    }
 }
 
 export default {
@@ -176,8 +237,92 @@ export default {
 
         const debugLogs: string[] = [];
         const url = new URL(request.url);
-    // 调试模式配置（根据URL参数控制）
-        const debugMode = ALLOW_DEBUG && url.searchParams.get('debug') === 'true';
+        
+        // 调试模式配置
+        const debugMode = url.searchParams.get('debug') === 'true'; // 永远允许调试模式
+        debugLogs.push(`Request URL: ${url.toString()}`);
+        debugLogs.push(`Query Parameters: ${JSON.stringify(Object.fromEntries(url.searchParams.entries()))}`);
+        
+        // 检查是否需要将请求转发到外部 API
+        const ragParam = url.searchParams.get('rag');
+        debugLogs.push(`RAG parameter value: ${ragParam}`);
+        
+        const ragMode = ragParam !== 'false';
+        debugLogs.push(`RAG mode enabled: ${ragMode}`);
+        
+        if (!ragMode) {
+            // rag=false，将请求转发到外部 API
+            debugLogs.push("Forwarding mode activated, preparing to forward request");
+            try {
+                const response = await forwardToExternalAPI(url, request, debugLogs);
+                
+                // 如果启用了调试模式，附加调试日志
+                if (debugMode) {
+                    // 尝试解析响应内容
+                    const originalBody = await response.text();
+                    let responseBody;
+                    
+                    try {
+                        // 尝试解析为 JSON
+                        responseBody = JSON.parse(originalBody);
+                        responseBody.debug = debugLogs;
+                        responseBody.forwarded = true;
+                        
+                        return new Response(
+                            JSON.stringify(responseBody),
+                            {
+                                status: response.status,
+                                headers: {
+                                    'Content-Type': 'application/json; charset=utf-8',
+                                    'Access-Control-Allow-Origin': '*'
+                                }
+                            }
+                        );
+                    } catch (e) {
+                        // 如果不是 JSON，返回原始内容加上调试信息
+                        return new Response(
+                            JSON.stringify({
+                                original_response: originalBody,
+                                debug: debugLogs,
+                                forwarded: true
+                            }),
+                            {
+                                status: response.status,
+                                headers: {
+                                    'Content-Type': response.headers.get('Content-Type') || 'application/json; charset=utf-8',
+                                    'Access-Control-Allow-Origin': '*'
+                                }
+                            }
+                        );
+                    }
+                }
+                
+                return response;
+            } catch (error: unknown) {
+                const searchError = error as SearchError;
+                debugLogs.push("Forwarding error: " + JSON.stringify({
+                    message: searchError.message,
+                    stack: searchError.stack,
+                    error: error
+                }));
+                
+                return new Response(
+                    JSON.stringify({ 
+                        error: "Failed to forward request to external API", 
+                        message: searchError.message,
+                        debug: debugLogs,
+                        forwarded_attempt: true
+                    }),
+                    {
+                        status: 502,
+                        headers: {
+                            'Content-Type': 'application/json; charset=utf-8',
+                            'Access-Control-Allow-Origin': '*'
+                        }
+                    }
+                );
+            }
+        }
 
         try {
             const query = url.searchParams.get('query');
@@ -220,23 +365,40 @@ export default {
             // 调用 handleSearch 时传入 minRatio 参数
             const results = await handleSearch(query, minRatio, minSimilarity, maxResults, env, debugLogs);
             
-            // 根据 debug 模式返回不同格式
-            const responseBody = debugMode ? {
-                query,
-                results,
-                total: results.length,
-                debug: debugLogs
-            } : results;
-
-            return new Response(
-                JSON.stringify(responseBody),
-                {
-                    headers: {
-                        'Content-Type': 'application/json; charset=utf-8',
-                        'Access-Control-Allow-Origin': '*'
+            if (debugMode) {
+                // 调试模式下保持原格式
+                const responseBody = {
+                    query,
+                    results,
+                    total: results.length,
+                    debug: debugLogs
+                };
+                
+                return new Response(
+                    JSON.stringify(responseBody),
+                    {
+                        headers: {
+                            'Content-Type': 'application/json; charset=utf-8',
+                            'Access-Control-Allow-Origin': '*'
+                        }
                     }
-                }
-            );
+                );
+            } else {
+                // 非调试模式下使用 NDJSON 格式
+                const ndjson = results
+                    .map(result => JSON.stringify(result))
+                    .join('\n');
+                
+                return new Response(
+                    ndjson,
+                    {
+                        headers: {
+                            'Content-Type': 'text/plain; charset=utf-8',
+                            'Access-Control-Allow-Origin': '*'
+                        }
+                    }
+                );
+            }
         } catch (error: unknown) {
             const searchError = error as SearchError;
             debugLogs.push("Error occurred: " + JSON.stringify({
