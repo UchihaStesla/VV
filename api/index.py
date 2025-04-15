@@ -85,11 +85,11 @@ def generate_subtitle_search_stream(query_string):
 def search():
     """
     Performs a search.
-    If 'only_search=true', performs a DuckDuckGo web search ignoring other params.
+    If 'ai_search=true', performs a DuckDuckGo web search ignoring other params.
     Otherwise, performs a subtitle search using the Rust API with filtering parameters.
     """
     query = request.args.get('query', '')
-    only_search_str = request.args.get('only_search', 'false').lower()
+    ai_search_str = request.args.get('ai_search', 'false').lower()
 
     if not query:
         logger.warning("Search request received with empty query.")
@@ -98,7 +98,7 @@ def search():
             "message": "搜索关键词不能为空"
         }), 400
 
-    if only_search_str == 'true':
+    if ai_search_str == 'true':
         logger.info(f"Performing DuckDuckGo search for query: '{query}'")
         try:
             with DDGS() as ddgs:
@@ -175,7 +175,7 @@ def index():
                 "description": "Performs subtitle search or DuckDuckGo search.",
                 "params": {
                     "query": "(string, required) Search term.",
-                    "only_search": "(boolean, optional, default=false) If true, performs DuckDuckGo search and ignores other params.",
+                    "ai_search": "(boolean, optional, default=false) If true, performs DuckDuckGo search and ignores other params.",
                     "min_ratio": "(float, optional, default=50) Minimum ratio for subtitle search (0-100).",
                     "min_similarity": "(float, optional, default=0.5) Minimum similarity for subtitle search (0.0-1.0).",
                     "max_results": "(int, optional, default=50) Max results for subtitle search."

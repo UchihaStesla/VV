@@ -1,6 +1,6 @@
 // 调试模式配置
 const ALLOW_DEBUG = false; // 开启调试模式方便排查问题
-const EXTERNAL_API_URL = 'https://vvapi.cicada000.work/search'; // 外部 API 地址
+const EXTERNAL_API_URL = 'https://vv-api.vercel.app/search'; // 外部 API 地址
 
 // AI 服务相关类型定义
 interface SFEmbeddingResponse {
@@ -251,7 +251,7 @@ export default {
         debugLogs.push(`RAG mode enabled: ${ragMode}`);
         
         if (!ragMode) {
-            // rag=false，将请求转发到外部 API
+            // rag=false，将请求转发到外部 API，不检查max_results限制
             debugLogs.push("Forwarding mode activated, preparing to forward request");
             try {
                 const response = await forwardToExternalAPI(url, request, debugLogs);
@@ -329,7 +329,7 @@ export default {
             const minRatioStr = url.searchParams.get('min_ratio');
             const minRatio = minRatioStr ? parseFloat(minRatioStr) : undefined;
             const minSimilarity = parseFloat(url.searchParams.get('min_similarity') || '0.5');
-            const maxResults = parseInt(url.searchParams.get('max_results') || '10');
+            let maxResults = parseInt(url.searchParams.get('max_results') || '10');
 
             if (!query) {
                 const resp: ErrorResponse = { error: 'Missing query parameter' };
@@ -346,20 +346,10 @@ export default {
                 );
             }
 
-            // maxResults 限制
+            // 只在本地向量搜索时应用max_results限制
             if (maxResults > 20) {
-                const resp: ErrorResponse = { error: 'max_results cannot exceed 20' };
-                if (debugMode) { resp.debug = debugLogs; }
-                return new Response(
-                    JSON.stringify(resp),
-                    {
-                        status: 400,
-                        headers: {
-                            'Content-Type': 'application/json; charset=utf-8',
-                            'Access-Control-Allow-Origin': '*'
-                        }
-                    }
-                );
+                debugLogs.push(`Requested max_results=${maxResults} exceeds limit of 20, capping to 20`);
+                maxResults = 20;
             }
 
             // 调用 handleSearch 时传入 minRatio 参数
