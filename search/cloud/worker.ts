@@ -211,7 +211,7 @@ async function processWithAI(query: string, env: Env, debugLogs: string[], webSe
 
                 提取关键词时：
                 - 关键词必须是中文。
-                - 提取5-8个最能代表核心主题，最好带有评价性的词语。
+                - 提取5-8个最能代表核心主题，最好带有评价性、描述性的词语。
                 - 用顿号"、"分隔关键词。
 
                 你的回复格式必须严格遵循：

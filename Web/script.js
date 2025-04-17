@@ -447,7 +447,7 @@ const CONFIG = {
     "\u641c\u7d22\u4f60\u60f3\u8981\u7684\u5185\u5bb9",
   ],
   apiBaseUrl: "https://vvapi.cicada000.work",
-  semanticApiUrl: "https://emu.noxylva.org",
+  semanticApiUrl: "https://vvapi.cicada000.work",
   imageBaseUrl: "https://vv.noxylva.org",
   watermarkPath: "watermark.png",
   indexPreloadCount: 26
@@ -557,7 +557,7 @@ class SearchController {
       }
     }
 
-    const emuUrl = `${CONFIG.semanticApiUrl}/search?query=${encodeURIComponent(query)}&min_ratio=${minRatio}&min_similarity=${minSimilarity}`;
+    const emuUrl = `${CONFIG.semanticApiUrl}/search?query=${encodeURIComponent(query)}&min_ratio=${minRatio}&min_similarity=${minSimilarity}&rag=true`;
 
     try {
       console.log("使用语义搜索:", emuUrl);

@@ -10,7 +10,7 @@
 
 ## 致谢
 
-&emsp;&emsp;感谢[wen999di](https://github.com/wen999di)及其提交的[PR](https://github.com/Cicada000/VV/issues?q=is%3Apr+author%3Awen999di)，大幅提高了人脸检测准确率和字幕识别准确率。感谢[undef-i](https://github.com/undef-i)及其提交的[PR](https://github.com/Cicada000/VV/issues?q=is%3Apr+author%3Aundef-i)，大幅提高了字幕检索速度，并且添加了GPU支持，大幅减少了新版本的人脸识别和字幕识别所需的时间。
+&emsp;&emsp;感谢[wen999di](https://github.com/wen999di)及其提交的[PR](https://github.com/Cicada000/VV/issues?q=is%3Apr+author%3Awen999di)，大幅提高了人脸检测准确率和字幕识别准确率，同时增加了向量检索的功能。感谢[undef-i](https://github.com/undef-i)及其提交的[PR](https://github.com/Cicada000/VV/issues?q=is%3Apr+author%3Aundef-i)，大幅提高了字幕检索速度，构建了更好看的前端页面，并且添加了GPU支持，大幅减少了新版本的人脸识别和字幕识别所需的时间。
 
 ## 项目简介
 
