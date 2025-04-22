@@ -1,5 +1,5 @@
 'use strict'; class SubtitleDatabase {
-    constructor() { this.db = null; this.isLoading = false; this.isLoaded = false; this.loadPromise = null; this.progressCallback = null; this.version = "1.0.0" } async clearCache() { try { await dbStorage.removeItem("databases", "subtitleDB"); await dbStorage.setItem("databases", "version", this.version); this.db = null; this.isLoaded = false; this.isLoading = false; this.loadPromise = null; return true } catch (error) { throw error; } } getDebugInfo() {
+    constructor() { this.db = null; this.isLoading = false; this.isLoaded = false; this.loadPromise = null; this.progressCallback = null; this.version = "1.0.1" } async clearCache() { try { await dbStorage.removeItem("databases", "subtitleDB"); await dbStorage.setItem("databases", "version", this.version); this.db = null; this.isLoaded = false; this.isLoading = false; this.loadPromise = null; return true } catch (error) { throw error; } } getDebugInfo() {
         return {
             version: this.version, isLoaded: this.isLoaded, isLoading: this.isLoading,
             recordCount: this.db ? this.db.length : 0, memoryUsage: this.db ? JSON.stringify(this.db).length : 0, cacheStatus: this.isLoaded ? "\u5df2\u52a0\u8f7d" : this.isLoading ? "\u52a0\u8f7d\u4e2d" : "\u672a\u52a0\u8f7d"

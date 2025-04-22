@@ -8,3 +8,6 @@ binding = "AI"
 [[vectorize]]
 binding = "SUBTITLE_INDEX"
 index_name = "vv-search"
+
+[observability.logs]
+enabled = true
