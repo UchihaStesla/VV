@@ -485,6 +485,28 @@ export default {
             );
         }
         
+        // Parse min_ratio and min_similarity for RAG mode
+        let minRatioForRAG: number | undefined;
+        let minSimilarityForRAG: number = 0.5; // Default for RAG keyword searches
+
+        if (ragMode) {
+            const minRatioParam = url.searchParams.get('min_ratio');
+            const minSimilarityParam = url.searchParams.get('min_similarity');
+
+            minRatioForRAG = minRatioParam ? parseFloat(minRatioParam) : undefined;
+            if (minRatioForRAG !== undefined && (isNaN(minRatioForRAG) || minRatioForRAG < 0 || minRatioForRAG > 100)) {
+                debugLogs.push(`Invalid min_ratio value for RAG: ${minRatioParam}, using default (undefined)`);
+                minRatioForRAG = undefined;
+            }
+
+            minSimilarityForRAG = minSimilarityParam ? parseFloat(minSimilarityParam) : 0.5;
+            if (isNaN(minSimilarityForRAG) || minSimilarityForRAG < 0 || minSimilarityForRAG > 1) {
+                debugLogs.push(`Invalid min_similarity value for RAG: ${minSimilarityParam}, using default 0.5`);
+                minSimilarityForRAG = 0.5;
+            }
+            debugLogs.push(`Parsed for RAG - minRatio: ${minRatioForRAG}, minSimilarity: ${minSimilarityForRAG}`);
+        }
+
         if (!ragMode) {
             debugLogs.push("Forwarding mode activated, preparing to forward request");
             try {
@@ -626,9 +648,9 @@ export default {
                     debugLogs.push(`Starting concurrent vector search for ${aiResult.keywords.length} keywords`);
                     
                     // 创建一个函数来处理单个关键词的向量搜索
-                    const searchKeyword = async (keyword: string): Promise<SearchResult[]> => {
+                    const searchKeyword = async (keyword: string, currentMinRatio: number | undefined, currentMinSimilarity: number): Promise<SearchResult[]> => {
                         try {
-                            debugLogs.push(`Performing vector search for keyword: ${keyword}`);
+                            debugLogs.push(`Performing vector search for keyword: ${keyword} with minRatio: ${currentMinRatio}, minSimilarity: ${currentMinSimilarity}`);
                             
                             let embeddingResult;
                             
@@ -668,10 +690,16 @@ export default {
                             }
                             
                             // 查询向量数据库
+                            const filterCriteria = (currentMinRatio !== undefined && !isNaN(currentMinRatio) && currentMinRatio > 0)
+                                ? { image_similarity: { $gte: currentMinRatio / 100 } }
+                                : undefined;
+
                             const queryOptions = {
                                 topK: 5, // 每个关键词最多返回5条结果
-                                returnMetadata: "all"
+                                returnMetadata: "all",
+                                filter: filterCriteria
                             };
+                            debugLogs.push(`Query options for keyword ${keyword}: ${JSON.stringify(queryOptions)}`);
                             
                             const queryResult = await env.SUBTITLE_INDEX.query(embeddingResult.data[0], queryOptions);
                             debugLogs.push(`Vector query result for keyword ${keyword}: ${JSON.stringify(queryResult)}`);
@@ -684,7 +712,7 @@ export default {
                                     match_ratio: v.score,
                                     similarity: v.metadata.image_similarity
                                 }))
-                                .filter(v => v.match_ratio >= 0.5)
+                                .filter(v => v.match_ratio >= currentMinSimilarity) // Apply minSimilarity filter
                                 .sort((a, b) => b.match_ratio - a.match_ratio)
                                 .slice(0, 5) // 确保每个关键词最多返回5条结果
                                 .map(v => ({
@@ -700,7 +728,7 @@ export default {
                     
                     // 并发执行所有关键词的向量搜索
                     const searchResultsArrays = await Promise.all(
-                        aiResult.keywords.map(keyword => searchKeyword(keyword))
+                        aiResult.keywords.map(keyword => searchKeyword(keyword, minRatioForRAG, minSimilarityForRAG))
                     );
                     
                     // 合并所有结果

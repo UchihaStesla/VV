@@ -42,8 +42,6 @@ def create_binary_index(mapping_data, index_file):
         folder_count = struct.unpack('<I', f.read(4))[0]
         folders = [struct.unpack('<I', f.read(4))[0] for _ in range(folder_count)]
         file_count = struct.unpack('<I', f.read(4))[0]
-        
-
 def read_frame_offset(index_file, folder_id, frame_num):
     with open(index_file, 'rb') as f:
         data = f.read()
@@ -52,7 +50,6 @@ def read_frame_offset(index_file, folder_id, frame_num):
         folder_count = struct.unpack('<I', f.read(4))[0]
         folders = [struct.unpack('<I', f.read(4))[0] for _ in range(folder_count)]
         file_count = struct.unpack('<I', f.read(4))[0]
-        
         print(f"{grid_w}x{grid_h}")
         print(f"{folders}")
         print(f"{file_count}")
@@ -72,7 +69,6 @@ def read_frame_offset(index_file, folder_id, frame_num):
                 left = mid + 1
             else:
                 right = mid - 1
-        
         return None, None
 
 def combine_files(input_folders, output_file, index_file, grid_size=(60, 60)):
@@ -81,7 +77,6 @@ def combine_files(input_folders, output_file, index_file, grid_size=(60, 60)):
         'folders': input_folders,
         'files': {}
     }
-    
     current_offset = 0
     with open(output_file, 'wb') as outfile:
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -89,13 +84,13 @@ def combine_files(input_folders, output_file, index_file, grid_size=(60, 60)):
                 folder_path = os.path.join("../frames", str(folder))
                 if not os.path.exists(folder_path):
                     continue
-                
+
                 webp_files = [f for f in os.listdir(folder_path) if f.endswith('.webp')]
                 webp_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))  # 修改排序逻辑
-                
+
                 if not webp_files:
                     continue
-                
+
                 total_files = min(len(webp_files), grid_size[0] * grid_size[1])
                 process_args = [
                     (os.path.join(folder_path, webp_file), idx, grid_size)
@@ -107,7 +102,7 @@ def combine_files(input_folders, output_file, index_file, grid_size=(60, 60)):
                     futures.append((future, webp_files[process_args.index(args)]))
                 for future, webp_file in tqdm(futures, desc=f"处理文件夹 {folder}"):
                     content, file_size, row, col = future.result()
-                    
+
                     with write_lock:
                         outfile.write(content)
                         frame_num = int(webp_file.split('_')[1].split('.')[0])
@@ -119,14 +114,15 @@ def combine_files(input_folders, output_file, index_file, grid_size=(60, 60)):
                         current_offset += file_size
     create_binary_index(mapping, index_file)
 
+
 def process_folder_groups():
     frames_dir = "../frames"
-    folders = sorted([int(f) for f in os.listdir(frames_dir) 
-                     if os.path.isdir(os.path.join(frames_dir, f)) and f.isdigit()])
-    
+    folders = sorted([int(f) for f in os.listdir(frames_dir)
+                      if os.path.isdir(os.path.join(frames_dir, f)) and f.isdigit()])
+
     current_group = []
     current_group_start = 1
-    
+
     for folder in folders:
         if folder < current_group_start + 10 and folder >= current_group_start:
             current_group.append(folder)
@@ -136,7 +132,7 @@ def process_folder_groups():
                 output_file = f"combined_{group_index}.bin"
                 index_file = f"index_{group_index}.bin"
                 combine_files(current_group, output_file, index_file)
-            
+
             current_group = [folder]
             current_group_start = (folder - 1) // 10 * 10 + 1
     if current_group:
@@ -144,6 +140,7 @@ def process_folder_groups():
         output_file = f"{group_index}.webp"
         index_file = f"{group_index}.index"
         combine_files(current_group, output_file, index_file)
+
 
 def extract_frame(combined_file, index_file, folder_id, frame_num):
     start_offset, end_offset = read_frame_offset(index_file, folder_id, frame_num)
@@ -156,15 +153,16 @@ def extract_frame(combined_file, index_file, folder_id, frame_num):
         else:
             return f.read(end_offset - start_offset)
 
+
 if __name__ == "__main__":
     process_folder_groups()
 
-    folder_id = 114
-    frame_num = 514
+    folder_id = 273
+    frame_num = 10
     group_index = (folder_id - 1) // 10
-    
-    combined_file = f"combined_{group_index}"
-    index_file = f"index_{group_index}"
+
+    combined_file = f"{group_index}.webp"
+    index_file = f"{group_index}.index"
     frame_data = extract_frame(combined_file, index_file, folder_id, frame_num)
     if frame_data:
         output_path = f"frame_{folder_id}_{frame_num}.webp"

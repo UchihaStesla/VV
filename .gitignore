@@ -175,3 +175,6 @@ search/local/index/
 node_modules/
 entries.json
 cloud_entries.json
+frames/
+/DataProcess/*.index
+/DataProcess/*.webp
