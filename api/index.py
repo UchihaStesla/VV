@@ -5,7 +5,9 @@ import subprocess
 from flask import Flask, request, jsonify, Response
 from duckduckgo_search import DDGS
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# 根据环境设置日志级别
+log_level = logging.DEBUG if os.environ.get('FLASK_ENV') == 'development' else logging.INFO
+logging.basicConfig(level=log_level, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -14,7 +16,7 @@ def generate_subtitle_search_stream(query_string):
     """Generates streaming JSON results from the Rust subtitle search API."""
     rust_process = None
     try:
-        logger.debug(f"Starting Rust subprocess with query: {query_string}")
+        logger.info(f"Starting Rust subprocess with query: {query_string}")
         rust_process = subprocess.Popen(
             ['./api/subtitle_search_api'], 
             stdin=subprocess.PIPE,
@@ -74,7 +76,7 @@ def generate_subtitle_search_stream(query_string):
                     rust_process.stderr.close()
                 rust_process.terminate()
                 rust_process.wait(timeout=5)
-                logger.debug(f"Rust process terminated with return code: {rust_process.returncode}")
+                logger.info(f"Rust process terminated with return code: {rust_process.returncode}")
             except ProcessLookupError:
                  logger.debug("Rust process already finished.")
             except Exception as e_term:
